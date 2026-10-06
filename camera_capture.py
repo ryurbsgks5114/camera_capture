@@ -33,12 +33,6 @@ def create_ftp_directory(ftp, directory):
 # FTP 사진 업로드 함수
 # ==========================================
 def upload_to_ftp(filename, date_folder):
-    print()
-    print("----------------------------------------")
-    print("FTP 업로드 시작")
-    print("파일:", filename)
-    print("----------------------------------------")
-
     try:
         ftp = FTP()
 
@@ -77,10 +71,9 @@ def upload_to_ftp(filename, date_folder):
                 "STOR " + filename.name,
                 file
             )
-
-        print("FTP 업로드 완료")
-        print("FTP 경로:", remote_directory)
-        print("파일:", filename.name)
+        print("----------------------------------------")
+        print("FTP 업로드 성공")
+        print("----------------------------------------")
 
         # FTP 연결 종료
         ftp.quit()
@@ -96,11 +89,8 @@ def upload_to_ftp(filename, date_folder):
 # 카메라 사진 촬영 함수
 # ==========================================
 def capture_image(camera_device, filename):
-    print()
     print("----------------------------------------")
     print("카메라:", camera_device)
-    print("저장 위치:", OUTPUT_DIR)
-    print("----------------------------------------")
 
     command = [
         "v4l2-ctl",
@@ -119,6 +109,7 @@ def capture_image(camera_device, filename):
 
         print("촬영 완료")
         print("파일:", filename)
+        print("----------------------------------------")
 
         return True
     except subprocess.CalledProcessError as error:
@@ -164,7 +155,6 @@ def capture_cameras():
         "T_" + timestamp + ".jpg"
     )
 
-    print()
     print("========================================")
     print("촬영 시작")
     print(
@@ -194,7 +184,6 @@ def capture_cameras():
     # --------------------------------------
     capture_elapsed = time.time() - capture_start
 
-    print()
     print("========================================")
     print("촬영 작업 완료")
     print(
@@ -202,8 +191,7 @@ def capture_cameras():
         round(capture_elapsed, 2),
         "초"
     )
-    print("========================================")
-
+    
     # 촬영 결과 확인
     if side_success and top_success:
         print("사이드 / 탑 카메라 촬영 성공")
@@ -213,6 +201,8 @@ def capture_cameras():
         print("탑 카메라만 촬영 성공")
     else:
         print("두 카메라 모두 촬영 실패")
+
+    print("========================================")
 
     # --------------------------------------
     # FTP 업로드
@@ -278,7 +268,7 @@ def main():
         )
 
 # ==========================================
-# 6. 프로그램 실행
+# 프로그램 실행
 # ==========================================
 if __name__ == "__main__":
     main()
