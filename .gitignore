@@ -1,0 +1,9 @@
+# 민감정보
+secret_config.py
+
+# 촬영 사진
+photos/
+
+# Python 캐시
+__pycache__/
+*.pyc
