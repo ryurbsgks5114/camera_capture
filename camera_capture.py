@@ -37,40 +37,24 @@ def upload_to_ftp(filename, date_folder):
         ftp = FTP()
 
         # FTP 서버 연결
-        ftp.connect(
-            FTP_HOST,
-            FTP_PORT,
-            timeout=10
-        )
+        ftp.connect(FTP_HOST, FTP_PORT, timeout=10)
 
         # 로그인
-        ftp.login(
-            FTP_USER,
-            FTP_PASSWORD
-        )
+        ftp.login(FTP_USER, FTP_PASSWORD)
 
         # Passive Mode 사용
         ftp.set_pasv(True)
 
         # 날짜별 FTP 폴더 경로
-        remote_directory = (
-            FTP_BASE_DIR
-            + "/"
-            + date_folder
-        )
+        remote_directory = (FTP_BASE_DIR + "/" + date_folder)
 
         # 폴더 생성 / 이동
-        create_ftp_directory(
-            ftp,
-            remote_directory
-        )
+        create_ftp_directory(ftp, remote_directory)
 
         # 파일 업로드
         with open(filename, "rb") as file:
-            ftp.storbinary(
-                "STOR " + filename.name,
-                file
-            )
+            ftp.storbinary("STOR " + filename.name, file)
+
         print("----------------------------------------")
         print("FTP 업로드 성공")
         print("----------------------------------------")
@@ -102,10 +86,7 @@ def capture_image(camera_device, filename):
     ]
 
     try:
-        subprocess.run(
-            command,
-            check=True
-        )
+        subprocess.run(command, check=True)
 
         print("촬영 완료")
         print("파일:", filename)
@@ -139,45 +120,29 @@ def capture_cameras():
     date_dir = OUTPUT_DIR / today
 
     # 폴더가 없으면 생성
-    date_dir.mkdir(
-        parents=True,
-        exist_ok=True
-    )
+    date_dir.mkdir(parents=True, exist_ok=True)
 
     # --------------------------------------
     # 사진 파일 이름
     # --------------------------------------
-    side_filename = date_dir / (
-        "S_" + timestamp + ".jpg"
-    )
+    side_filename = date_dir / ("S_" + timestamp + ".jpg")
 
-    top_filename = date_dir / (
-        "T_" + timestamp + ".jpg"
-    )
+    top_filename = date_dir / ("T_" + timestamp + ".jpg")
 
     print("========================================")
     print("촬영 시작")
-    print(
-        "촬영 시간:",
-        now.strftime("%Y-%m-%d %H:%M:%S")
-    )
+    print("촬영 시간:", now.strftime("%Y-%m-%d %H:%M:%S"))
     print("========================================")
 
     # --------------------------------------
     # 사이드 카메라 촬영
     # --------------------------------------
-    side_success = capture_image(
-        SIDE_CAMERA,
-        side_filename
-    )
+    side_success = capture_image(SIDE_CAMERA, side_filename)
 
     # --------------------------------------
     # 탑 카메라 촬영
     # --------------------------------------
-    top_success = capture_image(
-        TOP_CAMERA,
-        top_filename
-    )
+    top_success = capture_image(TOP_CAMERA, top_filename)
 
     # --------------------------------------
     # 촬영에 걸린 시간 계산
@@ -186,11 +151,7 @@ def capture_cameras():
 
     print("========================================")
     print("촬영 작업 완료")
-    print(
-        "촬영 소요 시간:",
-        round(capture_elapsed, 2),
-        "초"
-    )
+    print("촬영 소요 시간:", round(capture_elapsed, 2), "초")
     
     # 촬영 결과 확인
     if side_success and top_success:
@@ -208,16 +169,10 @@ def capture_cameras():
     # FTP 업로드
     # --------------------------------------
     if side_success:
-        upload_to_ftp(
-            side_filename,
-            today
-        )
+        upload_to_ftp(side_filename, today)
 
     if top_success:
-        upload_to_ftp(
-            top_filename,
-            today
-        )
+        upload_to_ftp(top_filename, today)
 
     return capture_elapsed
 
@@ -234,11 +189,7 @@ def wait_until_next_capture(capture_elapsed):
     if wait_seconds < 0:
         wait_seconds = 0
 
-    print(
-        "다음 촬영까지",
-        round(wait_seconds, 2),
-        "초 대기합니다."
-    )
+    print("다음 촬영까지", round(wait_seconds, 2), "초 대기합니다.")
 
     time.sleep(wait_seconds)
 
@@ -263,9 +214,7 @@ def main():
     while True:
         capture_elapsed = capture_cameras()
 
-        wait_until_next_capture(
-            capture_elapsed
-        )
+        wait_until_next_capture(capture_elapsed)
 
 # ==========================================
 # 프로그램 실행
