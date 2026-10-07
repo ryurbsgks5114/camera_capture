@@ -32,7 +32,21 @@ def create_ftp_directory(ftp, directory):
 # ==========================================
 # FTP 사진 업로드 함수
 # ==========================================
-def upload_to_ftp(filename, date_folder):
+def upload_to_ftp(filename, date_folder, ftp_config=None):
+
+    if ftp_config is None:
+        ftp_host = FTP_HOST
+        ftp_port = FTP_PORT
+        ftp_user = FTP_USER
+        ftp_password = FTP_PASSWORD
+        ftp_base_dir = FTP_BASE_DIR
+    else:
+        ftp_host = ftp_config["host"]
+        ftp_port = int(ftp_config["port"])
+        ftp_user = ftp_config["user"]
+        ftp_password = ftp_config["password"]
+        ftp_base_dir = ftp_config["base_dir"]
+
     try:
         ftp = FTP()
 
@@ -103,7 +117,7 @@ def capture_image(camera_device, filename):
 # ==========================================
 # 두 카메라 촬영 함수
 # ==========================================
-def capture_cameras():
+def capture_cameras(storage_mode="both", ftp_config=None):
     # 촬영 시작 시간
     capture_start = time.time()
 
@@ -168,11 +182,31 @@ def capture_cameras():
     # --------------------------------------
     # FTP 업로드
     # --------------------------------------
-    if side_success:
-        upload_to_ftp(side_filename, today)
+    if storage_mode == "both":
+        if side_success:
+            upload_to_ftp(side_filename, today, ftp_config)
 
-    if top_success:
-        upload_to_ftp(top_filename, today)
+        if top_success:
+            upload_to_ftp(top_filename, today, ftp_config)
+    elif storage_mode == "ftp":
+        if side_success:
+            upload_success = upload_to_ftp(side_filename, today, ftp_config)
+
+            if upload_success:
+                try:
+                    side_filename.unlink()
+                except FileNotFoundError:
+                    pass
+        if top_success:
+            upload_success = upload_to_ftp(top_filename, today, ftp_config)
+
+            if upload_success:
+                try:
+                    top_filename.unlink()
+                except FileNotFoundError:
+                    pass
+    elif storage_mode == "local":
+        pass
 
     return capture_elapsed
 
@@ -212,7 +246,7 @@ def main():
     # 자동 촬영 반복
     # ======================================
     while True:
-        capture_elapsed = capture_cameras()
+        capture_elapsed = capture_cameras(storage_mode="both")
 
         wait_until_next_capture(capture_elapsed)
 
