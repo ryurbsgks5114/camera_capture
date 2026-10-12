@@ -1,6 +1,7 @@
 import threading
 from datetime import datetime
 from flask import Blueprint, jsonify, request
+import config
 import services.capture_service as capture_service
 
 capture_bp = Blueprint("capture", __name__)
@@ -38,8 +39,8 @@ def start_capture():
             "message": "촬영 시작 시간은 HH:MM:SS 형식이어야 합니다."
         }), 400
 
-    # 촬영 간격 검증 (기본값: 1분 -> 나중에 10분 이런 기본값 변경 예정)
-    interval_minutes = data.get("interval_minutes", 1)
+    # 촬영 간격 검증 (기본값은 config에 등록된 값)
+    interval_minutes = data.get("interval_minutes", config.INTERVAL_MINUTES)
     try:
         interval_minutes = int(interval_minutes)
     except (TypeError, ValueError):
@@ -54,7 +55,7 @@ def start_capture():
             "message": "촬영 간격은 1분 이상이어야 합니다."
         }), 400
 
-    # 저장 방식(storage_mode) 값 유효성 검증 (local, ftp, both)
+    # 저장 방식(storage_mode) 값 유효성 검증 (local, ftp, both / 기본값은 both)
     storage_mode = data.get("storage_mode", "both")
     if storage_mode not in ("local", "ftp", "both"):
         return jsonify({
