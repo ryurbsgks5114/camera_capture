@@ -1,6 +1,6 @@
 import time
 from datetime import datetime
-from config import SIDE_CAMERA, TOP_CAMERA, INTERVAL_MINUTES, OUTPUT_DIR
+from config import SIDE_CAMERA, TOP_CAMERA, ENABLE_TOP_CAMERA, INTERVAL_MINUTES, OUTPUT_DIR
 from camera.capture import capture_image
 from camera.storage import get_date_directory
 from services.ftp_service import upload_to_ftp
@@ -40,7 +40,12 @@ def capture_cameras(storage_mode="both", ftp_config=None):
 
     # 사이드, 탑 카메라 촬영
     side_success = capture_image(SIDE_CAMERA, side_filename)
-    top_success = capture_image(TOP_CAMERA, top_filename)
+
+    # 전압 부족 상황에서 테스트를 위한 카메라 1대만 설정
+    if ENABLE_TOP_CAMERA:
+        top_success = capture_image(TOP_CAMERA, top_filename)
+    else:
+        top_success = False
 
     # 촬영에 걸린 시간 계산
     capture_elapsed = time.time() - capture_start
