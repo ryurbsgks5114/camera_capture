@@ -1,8 +1,10 @@
+import os
 import threading
 from datetime import datetime
 from flask import Blueprint, jsonify, request
 import config
 import services.capture_service as capture_service
+from services.ftp_service import validate_ftp_connection
 
 capture_bp = Blueprint("capture", __name__)
 
@@ -99,6 +101,30 @@ def start_capture():
             "password": ftp_data["password"],
             "base_dir": ftp_data["base_dir"]
         }
+
+    # 현재 설정된 사이드 / 탑 뷰 카메라 장치가 연결되어 있는지 확인
+    missing_cameras = []
+
+    if not os.path.exists(config.SIDE_CAMERA):
+        missing_cameras.append("측면 카메라 ({})".format(config.SIDE_CAMERA))
+    if getattr(config, "ENABLE_TOP_CAMERA", True) and not os.path.exists(config.TOP_CAMERA):
+        missing_cameras.append("상단 카메라 ({})".format(config.TOP_CAMERA))
+
+    if missing_cameras:
+        return jsonify({
+            "success": False,
+            "message": "카메라 연결을 확인해 주세요: " + ", ".join(missing_cameras)
+        }), 503
+
+    # FTP가 필요한 저장 방식일 때만 FTP 연결 / 저장 경로를 확인
+    if storage_mode in ("ftp", "both"):
+        ftp_valid, ftp_message = validate_ftp_connection(ftp_config)
+
+        if not ftp_valid:
+            return jsonify({
+                "success": False,
+                "message": ftp_message
+            }), 503
 
     # 백그라운드 서비스 상태 업데이트
     capture_service.is_running = True
