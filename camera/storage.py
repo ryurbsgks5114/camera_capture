@@ -6,4 +6,5 @@ from config import OUTPUT_DIR
 def get_date_directory(today_str):
     date_dir = OUTPUT_DIR / today_str
     date_dir.mkdir(parents=True, exist_ok=True)
+    
     return date_dir

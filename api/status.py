@@ -3,7 +3,9 @@ import services.capture_service as capture_service
 
 status_bp = Blueprint("status", __name__)
 
+# ==========================================
 # 서버 및 촬영 상태 조회 API
+# ==========================================
 @status_bp.route("/status", methods=["GET"])
 def status():
     is_running = capture_service.is_running

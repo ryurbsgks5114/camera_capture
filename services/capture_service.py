@@ -66,17 +66,17 @@ def capture_cameras(storage_mode="both", ftp_config=None):
 
     print("========================================")
 
-    # --------------------------------------
     # FTP 업로드
-    # --------------------------------------
     if storage_mode == "both":
         if side_success:
             upload_to_ftp(side_filename, today, ftp_config)
+
         if top_success:
             upload_to_ftp(top_filename, today, ftp_config)
     elif storage_mode == "ftp":
         if side_success:
             upload_success = upload_to_ftp(side_filename, today, ftp_config)
+
             if upload_success:
                 try:
                     side_filename.unlink()
@@ -84,6 +84,7 @@ def capture_cameras(storage_mode="both", ftp_config=None):
                     pass
         if top_success:
             upload_success = upload_to_ftp(top_filename, today, ftp_config)
+
             if upload_success:
                 try:
                     top_filename.unlink()
@@ -109,9 +110,7 @@ def capture_loop(start_time, interval_minutes, storage_mode, ftp_config):
     print("저장 방식:", storage_mode)
     print("========================================")
 
-    # ======================================
     # 시작 시간 계산
-    # ======================================
     now = datetime.now()
     target_time = datetime.combine(now.date(), start_time)
 
@@ -124,9 +123,7 @@ def capture_loop(start_time, interval_minutes, storage_mode, ftp_config):
 
     interval_seconds = interval_minutes * 60
 
-    # ======================================
     # 반복 촬영 루프
-    # ======================================
     while is_running:
         wait_seconds = next_capture_time - time.monotonic()
 
@@ -136,8 +133,10 @@ def capture_loop(start_time, interval_minutes, storage_mode, ftp_config):
 
             while is_running:
                 wait_seconds = next_capture_time - time.monotonic()
+
                 if wait_seconds <= 0:
                     break
+
                 time.sleep(min(1, wait_seconds))
 
         # 대기 중 정지 신호(is_running=False)를 받은 경우 종료

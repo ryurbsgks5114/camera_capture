@@ -8,7 +8,9 @@ from services.ftp_service import validate_ftp_connection
 
 capture_bp = Blueprint("capture", __name__)
 
+# ==========================================
 # 카메라 촬영 시작 API
+# ==========================================
 @capture_bp.route("/start", methods=["POST"])
 def start_capture():
     # 이미 촬영이 실행 중인 경우 예외 처리
@@ -110,6 +112,7 @@ def start_capture():
     if getattr(config, "ENABLE_TOP_CAMERA", True) and not os.path.exists(config.TOP_CAMERA):
         missing_cameras.append("상단 카메라 ({})".format(config.TOP_CAMERA))
 
+    # 연결 되지 않은 카메라가 존재할 경우 503 에러 응답 반환
     if missing_cameras:
         return jsonify({
             "success": False,
@@ -152,7 +155,9 @@ def start_capture():
         "storage_mode": storage_mode
     })
 
+# ==========================================
 # 카메라 촬영 중지 API
+# ==========================================
 @capture_bp.route("/stop", methods=["POST"])
 def stop_capture():
     # 이미 정지된 상태인 경우 예외 처리
