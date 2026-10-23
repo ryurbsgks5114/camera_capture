@@ -10,8 +10,8 @@
 camera_capture/
 │
 ├─ server.py                     # Flask 서버 실행 및 라우트 등록
-├─ config.py                     # 카메라, 촬영 간격, 저장 경로 등 일반 설정
-├─ secret_config.py              # FTP 주소, 포트, 계정 및 비밀번호 등 민감정보
+├─ config.py                     # 카메라/촬영/로컬 저장/FTP 설정
+├─ secret_config.example.py      # FTP 민감정보 설정 파일 예시(값 입력 후 'example.' 부분 삭제)
 ├─ main.py                       # 서버 없이 라즈베리파이에서 단독으로 카메라 촬영 루프를 실행하는 독립형 진입점
 │
 ├─ camera/                       # 카메라 촬영 및 로컬 저장 폴더
@@ -21,6 +21,7 @@ camera_capture/
 ├─ services/                     # 주요 기능 및 서비스 로직
 │   ├─ capture_service.py        # 카메라 촬영, 자동 촬영 및 라즈베리파이 단독 실행용 기능 
 │   └─ ftp_service.py            # FTP 폴더 생성 및 사진 업로드
+│   └─ websocket_service.py      # WebSocket 연결 이벤트 처리 및 테스트 이벤트 전송
 │
 └─ api/                          # GUI에서 호출하는 HTTP API
     ├─ status.py                 # 서버 및 촬영 상태 조회 (/status)
@@ -100,3 +101,33 @@ camera_capture/
     "success": true,
     "message": "촬영 중지 명령을 전달했습니다."
   }
+
+## 📦 의존성 설치
+
+라즈베리파이 터미널에서 프로젝트 폴더로 이동합니다.
+
+```bash
+cd 경로/camera_capture
+```
+
+카메라 제어에 필요한 시스템 패키지를 설치합니다.
+
+```bash
+sudo apt update
+sudo apt install -y python3-pip v4l-utils
+```
+
+Python 서버 및 WebSocket 통신에 필요한 패키지를 설치합니다.
+
+```bash
+python3 -m pip install "python-socketio==5.11.0" "python-engineio==4.8.0" "websocket-client==1.6.4"
+```
+
+> 기존 라즈베리파이 환경에서 이미 서버가 정상 동작하고 있다면, 패키지 버전을 먼저 확인한 후 설치하세요.<br>
+Python 3.7 및 운영체제 환경에 따라 설치 가능 여부가 다를 수 있습니다.
+
+## 🚀 실행 방법
+
+```powershell
+python3 server.py
+```
