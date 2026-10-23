@@ -1,7 +1,7 @@
 import os
 import threading
 from datetime import datetime
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 import config
 import services.capture_service as capture_service
 from services.ftp_service import validate_ftp_connection
@@ -133,6 +133,9 @@ def start_capture():
     capture_service.is_running = True
     capture_service.current_interval_minutes = interval_minutes
 
+    # WebSocket 객체 가져오기
+    socketio = current_app.config.get("SOCKETIO")
+
     # 촬영 루프를 별도 데몬 스레드(Daemon Thread)로 실행
     capture_service.capture_thread = threading.Thread(
         target=capture_service.capture_loop,
@@ -140,7 +143,8 @@ def start_capture():
             start_time,
             interval_minutes,
             storage_mode,
-            ftp_config
+            ftp_config,
+            socketio
         ),
         daemon=True
     )

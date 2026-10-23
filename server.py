@@ -15,6 +15,9 @@ socketio = SocketIO(
     engineio_logger=False
 )
 
+# 촬영 API에서 사용할 수 있도록 Socket.IO 객체 등록
+app.config["SOCKETIO"] = socketio
+
 # 라우트 등록
 register_routes(app)
 

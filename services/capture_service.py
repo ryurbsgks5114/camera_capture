@@ -11,9 +11,34 @@ capture_thread = None
 current_interval_minutes = None
 
 # ==========================================
+# 촬영 완료 시 WebSocket을 통해 클라이언트에 이벤트 전송
+# ==========================================
+def emit_photo_saved(socketio, filename, view, captured_at):
+    # Socket.IO 인스턴스가 없는 경우 함수 종료
+    if socketio is None:
+        return
+
+    try:
+        # 클라이언트로 "photo_saved" 채널을 통해 사진 정보 데이터(촬영 뷰, 파일 이름, 전체 저장 경로, 촬영 시간) 전송
+        socketio.emit(
+            "photo_saved",
+            {
+                "type": "photo_saved",
+                "view": view,
+                "filename": filename.name,
+                "path": str(filename),
+                "captured_at": captured_at
+            }
+        )
+
+        print("[WebSocket] 사진 촬영 이벤트 전송:", filename.name)
+    except Exception as error:
+        print("[WebSocket] 사진 이벤트 전송 실패:", error)
+
+# ==========================================
 # 두 카메라 촬영 함수
 # ==========================================
-def capture_cameras(storage_mode="both", ftp_config=None):
+def capture_cameras(storage_mode="both", ftp_config=None, socketio=None):
     # 촬영 시작 시간
     capture_start = time.time()
 
@@ -41,9 +66,17 @@ def capture_cameras(storage_mode="both", ftp_config=None):
     # 사이드, 탑 카메라 촬영
     side_success = capture_image(SIDE_CAMERA, side_filename)
 
+    # 사이드 카메라 촬영 성공 시 WebSocket을 통해 저장 완료 이벤트 전송
+    if side_success:
+        emit_photo_saved(socketio, side_filename, "side", now.strftime("%Y-%m-%d %H:%M:%S"))
+
     # 전압 부족 상황에서 테스트를 위한 카메라 1대만 설정
     if ENABLE_TOP_CAMERA:
         top_success = capture_image(TOP_CAMERA, top_filename)
+
+        # 탑 카메라 촬영 성공 시 WebSocket을 통해 저장 완료 이벤트 전송
+        if top_success:
+            emit_photo_saved(socketio, top_filename, "top", now.strftime("%Y-%m-%d %H:%M:%S"))
     else:
         top_success = False
 
@@ -98,7 +131,7 @@ def capture_cameras(storage_mode="both", ftp_config=None):
 # ==========================================
 # 자동 촬영 루프 함수
 # ==========================================
-def capture_loop(start_time, interval_minutes, storage_mode, ftp_config):
+def capture_loop(start_time, interval_minutes, storage_mode, ftp_config, socketio=None):
     global is_running
 
     print()
@@ -144,7 +177,7 @@ def capture_loop(start_time, interval_minutes, storage_mode, ftp_config):
             break
 
         # 카메라 촬영 및 저장 수행
-        capture_cameras(storage_mode=storage_mode, ftp_config=ftp_config)
+        capture_cameras(storage_mode=storage_mode, ftp_config=ftp_config, socketio=socketio)
 
         # 다음 촬영 예정 시간 업데이트
         next_capture_time += interval_seconds
