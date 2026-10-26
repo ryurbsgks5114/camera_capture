@@ -1,6 +1,6 @@
 # 📷 Camera Capture - Raspberry Pi Server
 
-라즈베리파이 환경에서 카메라(사이드, 탑)를 제어하고, Flask 웹 서버를 통해 원격(프론트 GUI 애플리케이션)으로부터 명령을 받아 백그라운드에서 촬영 및 저장 업무를 수행하는 메인 백엔드 시스템입니다.
+라즈베리파이 환경에서 USB 카메라(사이드, 탑)를 제어하고, Flask 웹 서버를 통해 원격(프론트 GUI 애플리케이션)으로부터 명령을 받아 백그라운드에서 촬영 및 저장 업무를 수행하는 메인 백엔드 시스템입니다.
 
 ---
 
@@ -9,10 +9,10 @@
 ```text
 camera_capture/
 │
-├─ server.py                     # Flask 서버 실행 및 라우트 등록
+├─ server.py                     # Flask/Socket.IO 서버 실행 및 라우트 등록
 ├─ config.py                     # 카메라/촬영/로컬 저장/FTP 설정
 ├─ secret_config.example.py      # FTP 민감정보 설정 파일 예시(값 입력 후 'example.' 부분 삭제)
-├─ main.py                       # 서버 없이 라즈베리파이에서 단독으로 카메라 촬영 루프를 실행하는 독립형 진입점
+├─ main.py                       # 서버 API 없이 라즈베리파이에서 단독으로 카메라 촬영 루프를 실행하는 독립형 진입점
 │
 ├─ camera/                       # 카메라 촬영 및 로컬 저장 폴더
 │   ├─ capture.py                # 카메라 촬영
@@ -21,11 +21,12 @@ camera_capture/
 ├─ services/                     # 주요 기능 및 서비스 로직
 │   ├─ capture_service.py        # 카메라 촬영, 자동 촬영 및 라즈베리파이 단독 실행용 기능 
 │   └─ ftp_service.py            # FTP 폴더 생성 및 사진 업로드
-│   └─ websocket_service.py      # WebSocket 연결 이벤트 처리 및 테스트 이벤트 전송
+│   └─ websocket_service.py      # Socket.IO 연결/해제 이벤트 처리
 │
 └─ api/                          # GUI에서 호출하는 HTTP API
     ├─ status.py                 # 서버 및 촬영 상태 조회 (/status)
     ├─ capture.py                # 촬영 시작·중지 요청 처리 (/start, /stop)
+    ├─ photos.py                 # 촬영 사진 다운로드 처리 (/photos/<date>/<filename>)
     └─ routes.py                 # API 경로 등록
 ```
 
@@ -102,6 +103,25 @@ camera_capture/
     "message": "촬영 중지 명령을 전달했습니다."
   }
 
+---
+
+### 4. 촬영 사진 다운로드 (`GET /photos/<date>/<filename>`)
+
+라즈베리파이에 저장된 촬영 사진을 GUI에서 로컬 다운로드할 때 사용하는 API입니다.
+
+* **Method:** `GET`
+* **Endpoint:** `/photos/<date>/<filename>`
+* **Path Parameters:**
+  * `date`: 사진이 저장된 날짜 폴더명 (`YYYYMMDD` 형식, 예: `20261026`)
+  * `filename`: 사진 파일명 (`S_YYYYMMDD_HHMMSS.jpg` 또는 `T_YYYYMMDD_HHMMSS.jpg`)
+* **Request Body:** 없음 (`None`)
+* **Response (Success - 200 OK):**
+  * 요청한 사진 파일을 JPEG 파일로 반환합니다.
+* **Response (Error):**
+  * `400 Bad Request`: 날짜 또는 파일명 형식이 잘못되었거나 날짜가 일치하지 않음
+  * `404 Not Found`: 날짜 폴더 또는 사진 파일이 존재하지 않음
+  * 오류 JSON 예시:
+
 ## 📦 의존성 설치
 
 라즈베리파이 터미널에서 프로젝트 폴더로 이동합니다.
@@ -128,6 +148,6 @@ Python 3.7 및 운영체제 환경에 따라 설치 가능 여부가 다를 수 
 
 ## 🚀 실행 방법
 
-```powershell
+```bash
 python3 server.py
 ```
