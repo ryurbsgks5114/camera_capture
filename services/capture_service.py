@@ -1,3 +1,4 @@
+import base64
 import time
 from datetime import datetime
 from config import SIDE_CAMERA, TOP_CAMERA, ENABLE_TOP_CAMERA, INTERVAL_MINUTES, OUTPUT_DIR
@@ -12,24 +13,32 @@ current_interval_minutes = None
 
 # ==========================================
 # 촬영 완료 시 WebSocket을 통해 클라이언트에 이벤트 전송
+# 옵션에 따라 미리보기용 Base64 이미지 데이터 포함
 # ==========================================
-def emit_photo_saved(socketio, filename, view, captured_at):
+def emit_photo_saved(socketio, filename, view, captured_at, include_preview_data=False):
     # Socket.IO 인스턴스가 없는 경우 함수 종료
     if socketio is None:
         return
 
     try:
-        # 클라이언트로 "photo_saved" 채널을 통해 사진 정보 데이터(촬영 뷰, 파일 이름, 전체 저장 경로, 촬영 시간) 전송
-        socketio.emit(
-            "photo_saved",
-            {
-                "type": "photo_saved",
-                "view": view,
-                "filename": filename.name,
-                "path": str(filename),
-                "captured_at": captured_at
-            }
-        )
+        # 클라이언트로 전송할 기본 이벤트 데이터 딕셔너리 구성
+        event_data = {
+            "type": "photo_saved",
+            "view": view,
+            "filename": filename.name,
+            "path": str(filename),
+            "captured_at": captured_at
+        }
+
+        # FTP 모드에서 로컬 파일 삭제 전에 썸네일용 JPEG 데이터를 메모리로 전달
+        if include_preview_data:
+            with open(filename, "rb") as photo_file:
+                photo_data = photo_file.read()
+
+            event_data["preview_data"] = base64.b64encode(photo_data).decode("ascii")
+
+        # 'photo_saved' 채널을 통해 클라이언트에 이벤트 데이터 전송
+        socketio.emit("photo_saved", event_data)
 
         print("[WebSocket] 사진 촬영 이벤트 전송:", filename.name)
     except Exception as error:
@@ -68,7 +77,7 @@ def capture_cameras(storage_mode="both", ftp_config=None, socketio=None):
 
     # 사이드 카메라 촬영 성공 시 WebSocket을 통해 저장 완료 이벤트 전송
     if side_success:
-        emit_photo_saved(socketio, side_filename, "side", now.strftime("%Y-%m-%d %H:%M:%S"))
+        emit_photo_saved(socketio, side_filename, "side", now.strftime("%Y-%m-%d %H:%M:%S"), include_preview_data=(storage_mode == "ftp"))
 
     # 전압 부족 상황에서 테스트를 위한 카메라 1대만 설정
     if ENABLE_TOP_CAMERA:
@@ -76,7 +85,7 @@ def capture_cameras(storage_mode="both", ftp_config=None, socketio=None):
 
         # 탑 카메라 촬영 성공 시 WebSocket을 통해 저장 완료 이벤트 전송
         if top_success:
-            emit_photo_saved(socketio, top_filename, "top", now.strftime("%Y-%m-%d %H:%M:%S"))
+            emit_photo_saved(socketio, top_filename, "top", now.strftime("%Y-%m-%d %H:%M:%S"), include_preview_data=(storage_mode == "ftp"))
     else:
         top_success = False
 
