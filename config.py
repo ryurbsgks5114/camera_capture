@@ -10,11 +10,10 @@ from secret_config import (
 # 카메라 설정
 # ==========================================
 
-# 사이드 카메라
-SIDE_CAMERA = "/dev/video0"
-
-# 탑 카메라
-TOP_CAMERA = "/dev/video2"
+# 측면 카메라와 상단 카메라의 USB 물리적 경로
+BY_PATH_DIR = Path("/dev/v4l/by-path/")
+SIDE_USB_PATH_KEY = "usb-0:1.3"
+TOP_USB_PATH_KEY = "usb-0:1.5"
 
 # 현재 테스트는 측면 카메라 1대만 사용
 # 두 카메라 테스트로 돌아갈 때 True로 변경
