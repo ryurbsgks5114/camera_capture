@@ -1,7 +1,8 @@
 import base64
 import time
 from datetime import datetime
-from config import SIDE_CAMERA, TOP_CAMERA, ENABLE_TOP_CAMERA, INTERVAL_MINUTES, OUTPUT_DIR
+from config import ENABLE_TOP_CAMERA, INTERVAL_MINUTES, OUTPUT_DIR
+from camera.discovery import discover_cameras
 from camera.capture import capture_image
 from camera.storage import get_date_directory
 from services.ftp_service import upload_to_ftp
@@ -72,18 +73,31 @@ def capture_cameras(storage_mode="both", ftp_config=None, socketio=None):
     print("촬영 시간:", now.strftime("%Y-%m-%d %H:%M:%S"))
     print("========================================")
 
-    # 사이드, 탑 카메라 촬영
-    side_success = capture_image(SIDE_CAMERA, side_filename)
+    # USB 물리 경로 기준으로 카메라 검색
+    detected_cameras = discover_cameras()
+    side_camera = detected_cameras["side"]
+    top_camera = detected_cameras["top"]
 
-    # 사이드 카메라 촬영 성공 시 WebSocket을 통해 저장 완료 이벤트 전송
+    # 사이드 카메라 촬영
+    if side_camera:
+        side_success = capture_image(side_camera, side_filename)
+    else:
+        print("[촬영 실패] 사이드 카메라를 찾을 수 없습니다.")
+        side_success = False
+
+    # 사이드 촬영 성공 시 WebSocket 이벤트 전송
     if side_success:
         emit_photo_saved(socketio, side_filename, "side", now.strftime("%Y-%m-%d %H:%M:%S"), include_preview_data=(storage_mode == "ftp"))
 
-    # 전압 부족 상황에서 테스트를 위한 카메라 1대만 설정
+    # 탑 카메라 촬영
     if ENABLE_TOP_CAMERA:
-        top_success = capture_image(TOP_CAMERA, top_filename)
+        if top_camera:
+            top_success = capture_image(top_camera, top_filename)
+        else:
+            print("[촬영 실패] 탑 카메라를 찾을 수 없습니다.")
+            top_success = False
 
-        # 탑 카메라 촬영 성공 시 WebSocket을 통해 저장 완료 이벤트 전송
+        # 탑 촬영 성공 시 WebSocket 이벤트 전송
         if top_success:
             emit_photo_saved(socketio, top_filename, "top", now.strftime("%Y-%m-%d %H:%M:%S"), include_preview_data=(storage_mode == "ftp"))
     else:
@@ -226,8 +240,9 @@ def run_standalone_capture():
     print("========================================")
     print(" Camera Capture 프로그램 시작 (단독 실행)")
     print("========================================")
-    print("사이드 카메라:", SIDE_CAMERA)
-    print("탑 카메라:", TOP_CAMERA)
+    detected_cameras = discover_cameras()
+    print("사이드 카메라:", detected_cameras["side"])
+    print("탑 카메라:", detected_cameras["top"])
     print("촬영 간격:", INTERVAL_MINUTES, "분")
     print("사진 저장 위치:", OUTPUT_DIR)
     print("종료하려면 Ctrl + C 를 누르세요.")

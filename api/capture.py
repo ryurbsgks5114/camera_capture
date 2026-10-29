@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, request, current_app
 import config
 import services.capture_service as capture_service
 from services.ftp_service import validate_ftp_connection
+from camera.discovery import discover_cameras
 
 capture_bp = Blueprint("capture", __name__)
 
@@ -104,13 +105,17 @@ def start_capture():
             "base_dir": ftp_data["base_dir"]
         }
 
+    # USB 물리 경로를 기준으로 카메라 검색
+    detected_cameras = discover_cameras()
+
     # 현재 설정된 사이드 / 탑 뷰 카메라 장치가 연결되어 있는지 확인
     missing_cameras = []
 
-    if not os.path.exists(config.SIDE_CAMERA):
-        missing_cameras.append("측면 카메라 ({})".format(config.SIDE_CAMERA))
-    if getattr(config, "ENABLE_TOP_CAMERA", True) and not os.path.exists(config.TOP_CAMERA):
-        missing_cameras.append("상단 카메라 ({})".format(config.TOP_CAMERA))
+    if not detected_cameras["side"]:
+        missing_cameras.append("측면 카메라")
+
+    if (getattr(config, "ENABLE_TOP_CAMERA", True)and not detected_cameras["top"]):
+        missing_cameras.append("상단 카메라")
 
     # 연결 되지 않은 카메라가 존재할 경우 503 에러 응답 반환
     if missing_cameras:
