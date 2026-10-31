@@ -1,11 +1,10 @@
-import os
-import threading
-from datetime import datetime
-from flask import Blueprint, jsonify, request, current_app
 import config
 import services.capture_service as capture_service
-from services.ftp_service import validate_ftp_connection
+import threading
 from camera.discovery import discover_cameras
+from datetime import datetime
+from flask import Blueprint, jsonify, request, current_app
+from services.ftp_service import validate_ftp_connection
 
 capture_bp = Blueprint("capture", __name__)
 
@@ -67,6 +66,12 @@ def start_capture():
             "success": False,
             "message": "저장 방식이 올바르지 않습니다."
         }), 400
+
+    # 로컬 저장 경로 가져오기
+    local_path = None
+
+    if storage_mode in ("local", "both"):
+        local_path = data.get("local_path")
 
     # FTP 저장 방식일 경우 필수 설정값 검증
     ftp_config = None
@@ -149,7 +154,8 @@ def start_capture():
             interval_minutes,
             storage_mode,
             ftp_config,
-            socketio
+            socketio,
+            local_path
         ),
         daemon=True
     )

@@ -60,3 +60,38 @@ def capture_image(camera_device, filename):
         print("오류:", error)
 
         return False
+
+# ==========================================
+# 촬영된 원본 사진으로 썸네일 생성
+# ==========================================
+def create_thumbnail(filename):
+    command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel", "error",
+        "-nostats",
+        "-i", str(filename),
+        "-vf", "scale=480:-1",
+        "-frames:v", "1",
+        "-f", "image2pipe",
+        "-vcodec", "mjpeg",
+        "pipe:1"
+    ]
+
+    try:
+        # 원본 사진을 읽어 작은 JPEG 썸네일 데이터를 메모리로 생성
+        result = subprocess.run(command, capture_output=True, check=True, timeout=15)
+        
+        return result.stdout
+    except subprocess.CalledProcessError as error:
+        print("[썸네일 생성 실패] FFmpeg 오류:", error.returncode)
+
+        return None
+    except subprocess.TimeoutExpired:
+        print("[썸네일 생성 실패] 처리 시간 초과")
+
+        return None
+    except OSError as error:
+        print("[썸네일 생성 실패]", error)
+
+        return None

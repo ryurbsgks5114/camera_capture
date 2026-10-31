@@ -1,10 +1,10 @@
 import base64
 import time
 from datetime import datetime
-from config import ENABLE_TOP_CAMERA, INTERVAL_MINUTES, OUTPUT_DIR
+from camera.capture import capture_image, create_thumbnail
 from camera.discovery import discover_cameras
-from camera.capture import capture_image
 from camera.storage import get_date_directory
+from config import ENABLE_TOP_CAMERA, INTERVAL_MINUTES, OUTPUT_DIR
 from services.ftp_service import upload_to_ftp
 
 # 전역 상태 변수 관리
@@ -14,41 +14,43 @@ current_interval_minutes = None
 
 # ==========================================
 # 촬영 완료 시 WebSocket을 통해 클라이언트에 이벤트 전송
-# 옵션에 따라 미리보기용 Base64 이미지 데이터 포함
+# 썸네일 데이터만 Base64로 전달
 # ==========================================
-def emit_photo_saved(socketio, filename, view, captured_at, include_preview_data=False):
+def emit_photo_saved(socketio, filename, view, captured_at):
     # Socket.IO 인스턴스가 없는 경우 함수 종료
     if socketio is None:
         return
 
     try:
-        # 클라이언트로 전송할 기본 이벤트 데이터 딕셔너리 구성
+        # 썸네일 JPEG 데이터 생성
+        thumbnail_data = create_thumbnail(filename)
+
+        if not thumbnail_data:
+            print("WebSocket] 썸네일 데이터가 없어 이벤트 전송을 건너뜁니다:", filename.name)
+
+            return
+
+        # 클라이언트로 전송할 이벤트 데이터 구성
         event_data = {
             "type": "photo_saved",
             "view": view,
             "filename": filename.name,
             "path": str(filename),
-            "captured_at": captured_at
+            "captured_at": captured_at,
+            "preview_data": base64.b64encode(thumbnail_data).decode("ascii")
         }
 
-        # FTP 모드에서 로컬 파일 삭제 전에 썸네일용 JPEG 데이터를 메모리로 전달
-        if include_preview_data:
-            with open(filename, "rb") as photo_file:
-                photo_data = photo_file.read()
-
-            event_data["preview_data"] = base64.b64encode(photo_data).decode("ascii")
-
-        # 'photo_saved' 채널을 통해 클라이언트에 이벤트 데이터 전송
+        # 'photo_saved' 채널을 통해 이벤트 전송
         socketio.emit("photo_saved", event_data)
 
-        print("[WebSocket] 사진 촬영 이벤트 전송:", filename.name)
+        print("[WebSocket] 사진 썸네일 이벤트 전송:", filename.name)
     except Exception as error:
         print("[WebSocket] 사진 이벤트 전송 실패:", error)
 
 # ==========================================
 # 두 카메라 촬영 함수
 # ==========================================
-def capture_cameras(storage_mode="both", ftp_config=None, socketio=None):
+def capture_cameras(storage_mode="both", ftp_config=None, socketio=None, local_path=None):
     # 촬영 시작 시간
     capture_start = time.time()
 
@@ -61,8 +63,14 @@ def capture_cameras(storage_mode="both", ftp_config=None, socketio=None):
     # 오늘 날짜 폴더
     today = now.strftime("%Y%m%d")
 
+    # 저장 방식에 따른 저장 위치 설정
+    if storage_mode in ("local", "both"):
+        storage_path = local_path or OUTPUT_DIR
+    else:
+        storage_path = OUTPUT_DIR
+
     # 저장 폴더 생성 및 경로 할당
-    date_dir = get_date_directory(today)
+    date_dir = get_date_directory(today, storage_path)
 
     # 사진 파일 이름
     side_filename = date_dir / ("S_" + timestamp + ".jpg")
@@ -87,7 +95,7 @@ def capture_cameras(storage_mode="both", ftp_config=None, socketio=None):
 
     # 사이드 촬영 성공 시 WebSocket 이벤트 전송
     if side_success:
-        emit_photo_saved(socketio, side_filename, "side", now.strftime("%Y-%m-%d %H:%M:%S"), include_preview_data=(storage_mode == "ftp"))
+        emit_photo_saved(socketio, side_filename, "side", now.strftime("%Y-%m-%d %H:%M:%S"))
 
     # 탑 카메라 촬영
     if ENABLE_TOP_CAMERA:
@@ -99,7 +107,7 @@ def capture_cameras(storage_mode="both", ftp_config=None, socketio=None):
 
         # 탑 촬영 성공 시 WebSocket 이벤트 전송
         if top_success:
-            emit_photo_saved(socketio, top_filename, "top", now.strftime("%Y-%m-%d %H:%M:%S"), include_preview_data=(storage_mode == "ftp"))
+            emit_photo_saved(socketio, top_filename, "top", now.strftime("%Y-%m-%d %H:%M:%S"))
     else:
         top_success = False
 
@@ -131,21 +139,26 @@ def capture_cameras(storage_mode="both", ftp_config=None, socketio=None):
             upload_to_ftp(top_filename, today, ftp_config)
     elif storage_mode == "ftp":
         if side_success:
-            upload_success = upload_to_ftp(side_filename, today, ftp_config)
-
-            if upload_success:
+            try:
+                upload_to_ftp(side_filename, today, ftp_config)
+            finally:
                 try:
                     side_filename.unlink()
                 except FileNotFoundError:
                     pass
-        if top_success:
-            upload_success = upload_to_ftp(top_filename, today, ftp_config)
+                except OSError as error:
+                    print("[S_임시 파일 삭제 실패]", error)
 
-            if upload_success:
+        if top_success:
+            try:
+                upload_to_ftp(top_filename, today, ftp_config)
+            finally:
                 try:
                     top_filename.unlink()
                 except FileNotFoundError:
                     pass
+                except OSError as error:
+                    print("[T_임시 파일 삭제 실패]", error)
     elif storage_mode == "local":
         pass
 
@@ -154,7 +167,7 @@ def capture_cameras(storage_mode="both", ftp_config=None, socketio=None):
 # ==========================================
 # 자동 촬영 루프 함수
 # ==========================================
-def capture_loop(start_time, interval_minutes, storage_mode, ftp_config, socketio=None):
+def capture_loop(start_time, interval_minutes, storage_mode, ftp_config, socketio=None, local_path=None):
     global is_running
 
     print()
@@ -200,7 +213,7 @@ def capture_loop(start_time, interval_minutes, storage_mode, ftp_config, socketi
             break
 
         # 카메라 촬영 및 저장 수행
-        capture_cameras(storage_mode=storage_mode, ftp_config=ftp_config, socketio=socketio)
+        capture_cameras(storage_mode=storage_mode, ftp_config=ftp_config, socketio=socketio, local_path=local_path)
 
         # 다음 촬영 예정 시간 업데이트
         next_capture_time += interval_seconds
