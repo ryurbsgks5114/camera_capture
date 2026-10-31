@@ -11,13 +11,19 @@ from secret_config import (
 # ==========================================
 
 # 측면 카메라와 상단 카메라의 USB 물리적 경로
-BY_PATH_DIR = Path("/dev/v4l/by-path/")
-SIDE_USB_PATH_KEY = "usb-0:1.3"
-TOP_USB_PATH_KEY = "usb-0:1.5"
+SIDE_CAMERA_LOCATION_ID = (
+    "PCIROOT(0)#PCI(0201)#PCI(0000)#PCI(0C00)"
+    "#PCI(0000)#USBROOT(0)#USB(15)#USBMI(0)"
+)
+TOP_CAMERA_LOCATION_ID = ""
 
 # 현재 테스트는 측면 카메라 1대만 사용
 # 두 카메라 테스트로 돌아갈 때 True로 변경
 ENABLE_TOP_CAMERA = False
+
+# 카메라 촬영 해상도
+CAPTURE_WIDTH = 1920
+CAPTURE_HEIGHT = 1080
 
 # ==========================================
 # 촬영 설정
@@ -31,7 +37,7 @@ INTERVAL_MINUTES = 1
 # ==========================================
 
 # 사진 저장 폴더
-OUTPUT_DIR = Path.home() / "camera_capture" / "photos"
+OUTPUT_DIR = Path(__file__).resolve().parent / "photos"
 
 # ==========================================
 # FTP 설정
