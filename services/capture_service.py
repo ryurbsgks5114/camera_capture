@@ -2,9 +2,13 @@ import base64
 import time
 from datetime import datetime
 from camera.capture import capture_image, create_thumbnail
-from camera.discovery import discover_cameras
+from camera.discovery import (
+    get_cached_cameras,
+    initialize_camera_mapping,
+    clear_camera_mapping
+)
 from camera.storage import get_date_directory
-from config import ENABLE_TOP_CAMERA, INTERVAL_MINUTES, OUTPUT_DIR, SIDE_CAMERA_DSHOW_NAME, TOP_CAMERA_DSHOW_NAME
+from config import ENABLE_TOP_CAMERA, INTERVAL_MINUTES, OUTPUT_DIR
 from services.ftp_service import upload_to_ftp
 
 # 전역 상태 변수 관리
@@ -81,14 +85,20 @@ def capture_cameras(storage_mode="both", ftp_config=None, socketio=None, local_p
     print("촬영 시간:", now.strftime("%Y-%m-%d %H:%M:%S"))
     print("========================================")
 
-    # USB 물리 경로 기준으로 카메라 검색
-    detected_cameras = discover_cameras()
-    side_camera = detected_cameras["side"]
-    top_camera = detected_cameras["top"]
+    # 서버 시작 시 자동 매칭한 카메라 정보 가져오기
+    detected_cameras = get_cached_cameras()
+
+    if detected_cameras is None:
+        print("[촬영 실패] 카메라 자동 매칭 정보가 초기화되지 않았습니다.")
+        side_camera = None
+        top_camera = None
+    else:
+        side_camera = detected_cameras["side"]
+        top_camera = detected_cameras["top"]
 
     # 사이드 카메라 촬영
     if side_camera:
-        side_success = capture_image(side_camera, side_filename, SIDE_CAMERA_DSHOW_NAME)
+        side_success = capture_image(side_camera, side_filename, side_camera["dshow_device_name"])
     else:
         print("[촬영 실패] 사이드 카메라를 찾을 수 없습니다.")
         side_success = False
@@ -100,7 +110,7 @@ def capture_cameras(storage_mode="both", ftp_config=None, socketio=None, local_p
     # 탑 카메라 촬영
     if ENABLE_TOP_CAMERA:
         if top_camera:
-            top_success = capture_image(top_camera, top_filename, TOP_CAMERA_DSHOW_NAME)
+            top_success = capture_image(top_camera, top_filename, top_camera["dshow_device_name"])
         else:
             print("[촬영 실패] 탑 카메라를 찾을 수 없습니다.")
             top_success = False
@@ -253,15 +263,28 @@ def run_standalone_capture():
     print("========================================")
     print(" Camera Capture 프로그램 시작 (단독 실행)")
     print("========================================")
-    detected_cameras = discover_cameras()
-    print("사이드 카메라:", detected_cameras["side"])
-    print("탑 카메라:", detected_cameras["top"])
+    # 단독 실행 시에도 카메라 자동 매칭을 최초 한 번 수행
+    initialize_camera_mapping()
+
+    detected_cameras = get_cached_cameras()
+
+    if detected_cameras:
+        print("사이드 카메라:", detected_cameras["side"])
+        print("탑 카메라:", detected_cameras["top"])
+
     print("촬영 간격:", INTERVAL_MINUTES, "분")
     print("사진 저장 위치:", OUTPUT_DIR)
     print("종료하려면 Ctrl + C 를 누르세요.")
 
-    while True:
-        capture_elapsed = capture_cameras(storage_mode="both")
-        
-        # 소요 시간을 고려하여 다음 촬영 시점까지 대기
-        wait_until_next_capture(capture_elapsed)
+    try:
+        while True:
+            capture_elapsed = capture_cameras(storage_mode="both")
+
+            # 소요 시간을 고려하여 다음 촬영 시점까지 대기
+            wait_until_next_capture(capture_elapsed)
+    except KeyboardInterrupt:
+        print()
+        print("[단독 실행] 사용자 종료 요청")
+    finally:
+        # 단독 실행 종료 시 카메라 매칭 정보 초기화
+        clear_camera_mapping()

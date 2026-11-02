@@ -1,7 +1,7 @@
 import config
 import services.capture_service as capture_service
 import threading
-from camera.discovery import discover_cameras
+from camera.discovery import get_cached_cameras, get_camera_mapping_error
 from datetime import datetime
 from flask import Blueprint, jsonify, request, current_app
 from services.ftp_service import validate_ftp_connection
@@ -110,16 +110,32 @@ def start_capture():
             "base_dir": ftp_data["base_dir"]
         }
 
-    # USB 물리 경로를 기준으로 카메라 검색
-    detected_cameras = discover_cameras()
+    # 서버 시작 시 자동 매칭한 카메라 정보 확인
+    detected_cameras = get_cached_cameras()
 
-    # 현재 설정된 사이드 / 탑 뷰 카메라 장치가 연결되어 있는지 확인
+    # 서버 시작 시 카메라 검색이 실행되지 않은 경우
+    if detected_cameras is None:
+        return jsonify({
+            "success": False,
+            "message": "카메라 자동 매칭 정보가 초기화되지 않았습니다."
+        }), 503
+
+    # 카메라 자동 매칭 실패 메시지 확인
+    mapping_error = get_camera_mapping_error()
+
+    if mapping_error:
+        return jsonify({
+            "success": False,
+            "message": "카메라 자동 매칭에 실패했습니다: " + mapping_error
+        }), 503
+
+    # 현재 설정된 카메라 연결 여부 확인
     missing_cameras = []
 
     if not detected_cameras["side"]:
         missing_cameras.append("측면 카메라")
 
-    if (getattr(config, "ENABLE_TOP_CAMERA", True)and not detected_cameras["top"]):
+    if (getattr(config, "ENABLE_TOP_CAMERA", True) and not detected_cameras["top"]):
         missing_cameras.append("상단 카메라")
 
     # 연결 되지 않은 카메라가 존재할 경우 503 에러 응답 반환
