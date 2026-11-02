@@ -4,12 +4,13 @@ from config import CAPTURE_WIDTH, CAPTURE_HEIGHT
 # ==========================================
 # 카메라 사진 촬영 함수
 # ==========================================
-def capture_image(camera_device, filename):
+def capture_image(camera_device, filename, dshow_device_name):
     # 카메라 검색 결과에서 DirectShow 장치 이름 가져오기
     camera_name = camera_device["name"]
 
     print("----------------------------------------")
     print("카메라:", camera_name)
+    print("FFmpeg 장치:", dshow_device_name)
 
     command = [
         "ffmpeg",
@@ -21,7 +22,7 @@ def capture_image(camera_device, filename):
         "-video_size",
         "{}x{}".format(CAPTURE_WIDTH, CAPTURE_HEIGHT),
         "-i",
-        "video={}".format(camera_name),
+        "video={}".format(dshow_device_name),
         "-frames:v",
         "1",
         "-q:v",

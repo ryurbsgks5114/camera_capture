@@ -4,7 +4,7 @@ from datetime import datetime
 from camera.capture import capture_image, create_thumbnail
 from camera.discovery import discover_cameras
 from camera.storage import get_date_directory
-from config import ENABLE_TOP_CAMERA, INTERVAL_MINUTES, OUTPUT_DIR
+from config import ENABLE_TOP_CAMERA, INTERVAL_MINUTES, OUTPUT_DIR, SIDE_CAMERA_DSHOW_NAME, TOP_CAMERA_DSHOW_NAME
 from services.ftp_service import upload_to_ftp
 
 # 전역 상태 변수 관리
@@ -88,7 +88,7 @@ def capture_cameras(storage_mode="both", ftp_config=None, socketio=None, local_p
 
     # 사이드 카메라 촬영
     if side_camera:
-        side_success = capture_image(side_camera, side_filename)
+        side_success = capture_image(side_camera, side_filename, SIDE_CAMERA_DSHOW_NAME)
     else:
         print("[촬영 실패] 사이드 카메라를 찾을 수 없습니다.")
         side_success = False
@@ -100,7 +100,7 @@ def capture_cameras(storage_mode="both", ftp_config=None, socketio=None, local_p
     # 탑 카메라 촬영
     if ENABLE_TOP_CAMERA:
         if top_camera:
-            top_success = capture_image(top_camera, top_filename)
+            top_success = capture_image(top_camera, top_filename, TOP_CAMERA_DSHOW_NAME)
         else:
             print("[촬영 실패] 탑 카메라를 찾을 수 없습니다.")
             top_success = False

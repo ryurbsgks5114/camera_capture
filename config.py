@@ -12,14 +12,25 @@ from secret_config import (
 
 # 측면 카메라와 상단 카메라의 USB 물리적 경로
 SIDE_CAMERA_LOCATION_ID = (
-    "PCIROOT(0)#PCI(0201)#PCI(0000)#PCI(0C00)"
-    "#PCI(0000)#USBROOT(0)#USB(15)#USBMI(0)"
+    "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(9)#USBMI(0)"
 )
-TOP_CAMERA_LOCATION_ID = ""
+TOP_CAMERA_LOCATION_ID = (
+    "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(1)#USBMI(0)"
+)
+
+# FFmpeg DirectShow 카메라 고유 장치명
+SIDE_CAMERA_DSHOW_NAME = (
+    r"@device_pnp_\\?\usb#vid_2757&pid_1303&mi_00#6&39f69e8c&0&0000"
+    r"#{65e8773d-8f56-11d0-a3b9-00a0c9223196}\global"
+)
+TOP_CAMERA_DSHOW_NAME = (
+    r"@device_pnp_\\?\usb#vid_2757&pid_1303&mi_00#6&35f8257f&0&0000"
+    r"#{65e8773d-8f56-11d0-a3b9-00a0c9223196}\global"
+)
 
 # 현재 테스트는 측면 카메라 1대만 사용
 # 두 카메라 테스트로 돌아갈 때 True로 변경
-ENABLE_TOP_CAMERA = False
+ENABLE_TOP_CAMERA = True
 
 # 카메라 촬영 해상도
 CAPTURE_WIDTH = 1920
