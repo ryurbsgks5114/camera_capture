@@ -22,8 +22,6 @@ def find_camera_for_usb_path(path_key, cameras):
         camera_location_id = camera.get("location_id", "")
 
         if camera_location_id.lower() == path_key.lower():
-            print("[카메라 인식] USB 장치 발견:", path_key, "->", camera.get("name"), "(index:", camera.get("index"), ")")
-
             return camera
 
     print("[카메라 인식 실패] USB 물리 경로:", path_key)
@@ -60,12 +58,12 @@ def enumerate_ffmpeg_cameras():
             if alternative_name.lower().startswith("@device_pnp_"):
                 ffmpeg_devices.append(alternative_name)
 
-        print("========== FFmpeg DirectShow 카메라 목록 ==========")
+        print("---------- FFmpeg DirectShow 카메라 목록 ----------")
 
         for device_name in ffmpeg_devices:
             print("FFmpeg 장치:", device_name)
 
-        print("==================================================")
+        print("----------------------------------------")
 
         return ffmpeg_devices
     except subprocess.TimeoutExpired:
@@ -152,16 +150,12 @@ def discover_cameras():
         # 연결된 USB 카메라 목록 조회
         cameras = enumerate_cameras()
 
-        print("========== comgrab3 카메라 목록 ==========")
+        print("---------- comgrab3 카메라 목록 ----------")
 
         for camera in cameras:
-            print("----------------------------------------")
             print("카메라 이름:", camera.get("name"))
-            print("카메라 인덱스:", camera.get("index"))
             print("USB 물리 경로:", camera.get("location_id"))
-            print("장치 경로:", camera.get("device_path"))
-
-        print("========================================")
+            print("----------------------------------------")
 
         # USB 물리 경로를 기준으로 측면 및 상단 카메라 검색
         side_camera = find_camera_for_usb_path(SIDE_CAMERA_LOCATION_ID, cameras)
@@ -189,10 +183,8 @@ def initialize_camera_mapping():
     global _cached_cameras
     global _camera_mapping_error
 
-    print()
     print("========================================")
     print("카메라 자동 매칭 시작")
-    print("========================================")
 
     try:
         # USB 물리 경로와 FFmpeg 장치명 자동 매칭
@@ -201,12 +193,6 @@ def initialize_camera_mapping():
         # 검색 결과를 메모리에 보관
         _cached_cameras = detected_cameras
         _camera_mapping_error = None
-
-        print("----------------------------------------")
-        print("측면 카메라:", _cached_cameras["side"])
-        print("상단 카메라:", _cached_cameras["top"])
-        print("카메라 매칭 결과 저장 완료")
-        print("========================================")
 
         return True
     except Exception as error:
