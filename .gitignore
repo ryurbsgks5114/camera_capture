@@ -7,3 +7,6 @@ photos/
 # Python 캐시
 __pycache__/
 *.pyc
+
+# 사용자 PC별 카메라 역할 설정
+camera_config.json

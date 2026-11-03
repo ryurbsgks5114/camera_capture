@@ -2,31 +2,14 @@ import re
 import subprocess
 import pythoncom
 from comgrab3 import enumerate_cameras
-from config import (SIDE_CAMERA_LOCATION_ID, TOP_CAMERA_LOCATION_ID)
+from camera.configuration import load_camera_config, save_camera_config
 
 # 서버 실행 중 사용할 카메라 매칭 결과
 _cached_cameras = None
+# 현재 PC에서 검색된 카메라 목록
+_available_cameras = []
 # 카메라 검색 중 발생한 오류 메시지
 _camera_mapping_error = None
-
-# ==========================================
-# USB 물리 경로 기반 카메라 검색 함수
-# ==========================================
-def find_camera_for_usb_path(path_key, cameras):
-    # USB 물리 경로가 설정되지 않은 경우 검색 종료
-    if not path_key:
-        return None
-
-    # 전달받은 USB 물리 경로와 일치하는 카메라 검색
-    for camera in cameras:
-        camera_location_id = camera.get("location_id", "")
-
-        if camera_location_id.lower() == path_key.lower():
-            return camera
-
-    print("[카메라 인식 실패] USB 물리 경로:", path_key)
-
-    return None
 
 # ==========================================
 # FFmpeg DirectShow 장치 목록 조회 함수
@@ -46,7 +29,7 @@ def enumerate_ffmpeg_cameras():
             check=False
         )
 
-        output = (result.stdout or "") + "\n" + (result.stderr or "")
+        output = (result.stdout or "") + "\\n" + (result.stderr or "")
 
         # Alternative name에서 DirectShow 장치 경로 추출
         alternative_names = re.findall(r'Alternative name "([^"]+)"', output)
@@ -101,7 +84,7 @@ def match_ffmpeg_device(camera, ffmpeg_devices):
 
     if not camera_device_path:
         print("[FFmpeg 매칭 실패] comgrab3 device_path가 없습니다.")
-        
+
         return None
 
     # 비교를 위해 장치 경로 정규화
@@ -140,9 +123,9 @@ def match_ffmpeg_device(camera, ffmpeg_devices):
     return matched_camera
 
 # ==========================================
-# 사이드 및 탑 카메라 전체 탐색 함수
+# 현재 PC에 연결된 카메라 전체 검색 함수
 # ==========================================
-def discover_cameras():
+def discover_available_cameras():
     try:
         # Windows COM 초기화
         pythoncom.CoInitialize()
@@ -157,56 +140,176 @@ def discover_cameras():
             print("USB 물리 경로:", camera.get("location_id"))
             print("----------------------------------------")
 
-        # USB 물리 경로를 기준으로 측면 및 상단 카메라 검색
-        side_camera = find_camera_for_usb_path(SIDE_CAMERA_LOCATION_ID, cameras)
-        top_camera = find_camera_for_usb_path(TOP_CAMERA_LOCATION_ID, cameras)
-
         # FFmpeg DirectShow 장치 목록 조회
         ffmpeg_devices = enumerate_ffmpeg_cameras()
 
-        # USB 카메라와 FFmpeg 장치명 자동 매칭
-        side_camera = match_ffmpeg_device(side_camera,ffmpeg_devices)
-        top_camera = match_ffmpeg_device(top_camera, ffmpeg_devices)
+        # 모든 카메라에 FFmpeg 장치명 연결
+        available_cameras = []
 
-        return {
-            "side": side_camera,
-            "top": top_camera
-        }
+        for camera in cameras:
+            matched_camera = match_ffmpeg_device(camera, ffmpeg_devices)
+
+            camera_info = dict(camera)
+            camera_info["dshow_device_name"] = (
+                matched_camera.get("dshow_device_name")
+                if matched_camera else None
+            )
+
+            available_cameras.append(camera_info)
+
+        return available_cameras
     finally:
         # Windows COM 초기화 해제
         pythoncom.CoUninitialize()
 
 # ==========================================
-# 서버 시작 시 카메라 자동 매칭 및 결과 저장
+# 카메라 역할 설정에 맞춰 Side / Top 매칭
 # ==========================================
-def initialize_camera_mapping():
+def apply_camera_config(camera_config):
     global _cached_cameras
     global _camera_mapping_error
 
+    side_camera_id = camera_config["side_camera_id"]
+    top_camera_id = camera_config["top_camera_id"]
+
+    side_camera = None
+    top_camera = None
+
+    for camera in _available_cameras:
+        location_id = camera.get("location_id", "")
+
+        if location_id.casefold() == side_camera_id.casefold():
+            side_camera = camera
+
+        if location_id.casefold() == top_camera_id.casefold():
+            top_camera = camera
+
+    if not side_camera or not top_camera:
+        _cached_cameras = {"side": None, "top": None}
+        _camera_mapping_error = (
+            "저장된 카메라 설정과 현재 연결된 카메라가 일치하지 않습니다. "
+            "카메라 역할을 다시 설정해 주세요."
+        )
+        print("[카메라 설정 확인 필요]", _camera_mapping_error)
+        return False
+
+    if not side_camera.get("dshow_device_name") or not top_camera.get("dshow_device_name"):
+        _cached_cameras = {"side": None, "top": None}
+        _camera_mapping_error = (
+            "선택한 카메라의 FFmpeg 장치 연결에 실패했습니다. "
+            "카메라 연결 상태를 확인해 주세요."
+        )
+        print("[카메라 설정 확인 필요]", _camera_mapping_error)
+        return False
+
+    _cached_cameras = {
+        "side": side_camera,
+        "top": top_camera
+    }
+    _camera_mapping_error = None
+
+    print("[카메라 역할 매칭 완료] Side:", side_camera.get("location_id"))
+    print("[카메라 역할 매칭 완료] Top:", top_camera.get("location_id"))
+
+    return True
+
+# ==========================================
+# 서버 시작 시 카메라 자동 검색 및 설정 적용
+# ==========================================
+def initialize_camera_mapping():
+    global _cached_cameras
+    global _available_cameras
+    global _camera_mapping_error
+
     print("========================================")
-    print("카메라 자동 매칭 시작")
+    print("카메라 자동 검색 시작")
 
     try:
-        # USB 물리 경로와 FFmpeg 장치명 자동 매칭
-        detected_cameras = discover_cameras()
+        # 현재 PC에 연결된 카메라 전체 검색
+        _available_cameras = discover_available_cameras()
 
-        # 검색 결과를 메모리에 보관
-        _cached_cameras = detected_cameras
-        _camera_mapping_error = None
+        # 저장된 Side / Top 역할 설정 불러오기
+        saved_config = load_camera_config()
 
-        return True
+        if not saved_config:
+            _cached_cameras = {"side": None, "top": None}
+            _camera_mapping_error = None
+
+            print("[카메라 최초 설정 필요] GUI에서 Side / Top 카메라를 지정해 주세요.")
+            print("========================================")
+
+            return True
+
+        # 저장된 역할 설정으로 카메라 자동 매칭
+        return apply_camera_config(saved_config)
     except Exception as error:
-        # 검색 실패 시 빈 결과를 보관하고 오류 내용 저장
-        _cached_cameras = {
-            "side": None,
-            "top": None
-        }
+        _available_cameras = []
+        _cached_cameras = {"side": None, "top": None}
         _camera_mapping_error = str(error)
 
-        print("[카메라 자동 매칭 오류]", error)
+        print("[카메라 자동 검색 오류]", error)
         print("========================================")
 
         return False
+
+# ==========================================
+# 현재 검색된 카메라 목록 가져오기
+# ==========================================
+def get_available_cameras():
+    return [
+        {
+            "name": camera.get("name", ""),
+            "location_id": camera.get("location_id", ""),
+            "dshow_device_name": camera.get("dshow_device_name")
+        }
+        for camera in _available_cameras
+    ]
+
+# ==========================================
+# 저장된 카메라 역할 설정 가져오기
+# ==========================================
+def get_saved_camera_config():
+    return load_camera_config()
+
+# ==========================================
+# GUI에서 지정한 카메라 역할 저장 및 적용
+# ==========================================
+def configure_cameras(side_camera_id, top_camera_id):
+    global _cached_cameras
+    global _camera_mapping_error
+
+    if side_camera_id == top_camera_id:
+        return False, "측면 카메라와 상단 카메라는 서로 달라야 합니다."
+
+    camera_ids = {
+        camera.get("location_id"): camera
+        for camera in _available_cameras
+    }
+
+    side_camera = camera_ids.get(side_camera_id)
+    top_camera = camera_ids.get(top_camera_id)
+
+    if not side_camera or not top_camera:
+        return False, "선택한 카메라를 찾을 수 없습니다. 카메라 목록을 새로 확인해 주세요."
+
+    if not side_camera.get("dshow_device_name") or not top_camera.get("dshow_device_name"):
+        return False, "선택한 카메라의 FFmpeg 장치 연결에 실패했습니다."
+
+    # JSON 파일에 카메라 역할 설정 저장
+    if not save_camera_config(side_camera_id, top_camera_id):
+        return False, "카메라 설정 파일을 저장하지 못했습니다."
+
+    # 저장한 설정을 현재 서버에도 즉시 적용
+    success = apply_camera_config({
+        "side_camera_id": side_camera_id,
+        "top_camera_id": top_camera_id
+    })
+
+    if not success:
+        return False, _camera_mapping_error or "카메라 설정을 적용하지 못했습니다."
+
+    print("[카메라 설정 저장 완료]")
+    return True, "카메라 설정이 저장되었습니다."
 
 # ==========================================
 # 메모리에 저장된 카메라 매칭 결과 가져오기
@@ -219,9 +322,11 @@ def get_cached_cameras():
 # ==========================================
 def clear_camera_mapping():
     global _cached_cameras
+    global _available_cameras
     global _camera_mapping_error
 
     _cached_cameras = None
+    _available_cameras = []
     _camera_mapping_error = None
 
     print("[카메라 자동 매칭] 메모리 정보 초기화 완료")

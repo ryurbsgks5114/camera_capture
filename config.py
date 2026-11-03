@@ -10,16 +10,8 @@ from secret_config import (
 # 카메라 설정
 # ==========================================
 
-# 측면 카메라와 상단 카메라의 USB 물리적 경로
-SIDE_CAMERA_LOCATION_ID = (
-    "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(9)#USBMI(0)"
-)
-TOP_CAMERA_LOCATION_ID = (
-    "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(1)#USBMI(0)"
-)
-
-# 현재 테스트는 측면 카메라 1대만 사용
-# 두 카메라 테스트로 돌아갈 때 True로 변경
+# Side / Top 카메라 역할은 최초 설정 시 GUI에서 지정하고
+# camera_config.json 파일에 저장하여 관리
 ENABLE_TOP_CAMERA = True
 
 # 카메라 촬영 해상도
