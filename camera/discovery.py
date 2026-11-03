@@ -169,8 +169,8 @@ def apply_camera_config(camera_config):
     global _cached_cameras
     global _camera_mapping_error
 
-    side_camera_id = camera_config["side_camera_id"]
-    top_camera_id = camera_config["top_camera_id"]
+    side_camera_id = camera_config.get("side_camera_id")
+    top_camera_id = camera_config.get("top_camera_id")
 
     side_camera = None
     top_camera = None
@@ -178,92 +178,148 @@ def apply_camera_config(camera_config):
     for camera in _available_cameras:
         location_id = camera.get("location_id", "")
 
-        if location_id.casefold() == side_camera_id.casefold():
+        if side_camera_id and location_id.casefold() == side_camera_id.casefold():
             side_camera = camera
 
-        if location_id.casefold() == top_camera_id.casefold():
+        if top_camera_id and location_id.casefold() == top_camera_id.casefold():
             top_camera = camera
 
-    if not side_camera or not top_camera:
-        _cached_cameras = {"side": None, "top": None}
-        _camera_mapping_error = (
-            "저장된 카메라 설정과 현재 연결된 카메라가 일치하지 않습니다. "
-            "카메라 역할을 다시 설정해 주세요."
-        )
-        print("[카메라 설정 확인 필요]", _camera_mapping_error)
-        return False
+    # A role may remain unassigned.
+    # Only assigned cameras are required to be connected.
+    errors = []
 
-    if not side_camera.get("dshow_device_name") or not top_camera.get("dshow_device_name"):
-        _cached_cameras = {"side": None, "top": None}
-        _camera_mapping_error = (
-            "선택한 카메라의 FFmpeg 장치 연결에 실패했습니다. "
-            "카메라 연결 상태를 확인해 주세요."
-        )
-        print("[카메라 설정 확인 필요]", _camera_mapping_error)
-        return False
+    if side_camera_id and not side_camera:
+        errors.append("저장된 사이드 카메라를 찾을 수 없습니다.")
+
+    if top_camera_id and not top_camera:
+        errors.append("저장된 탑 카메라를 찾을 수 없습니다.")
+
+    if side_camera and not side_camera.get("dshow_device_name"):
+        errors.append("사이드 카메라의 FFmpeg 장치 연결에 실패했습니다.")
+        side_camera = None
+
+    if top_camera and not top_camera.get("dshow_device_name"):
+        errors.append("탑 카메라의 FFmpeg 장치 연결에 실패했습니다.")
+        top_camera = None
 
     _cached_cameras = {
         "side": side_camera,
         "top": top_camera
     }
-    _camera_mapping_error = None
 
-    print("[카메라 역할 매칭 완료] Side:", side_camera.get("location_id"))
-    print("[카메라 역할 매칭 완료] Top:", top_camera.get("location_id"))
+    _camera_mapping_error = " ".join(errors) if errors else None
 
-    return True
+    print(
+        "[Camera role mapping]",
+        "Side:", side_camera.get("location_id") if side_camera else "Not assigned",
+        "Top:", top_camera.get("location_id") if top_camera else "Not assigned"
+    )
+
+    return not errors
 
 # ==========================================
 # 서버 시작 시 카메라 자동 검색 및 설정 적용
 # ==========================================
+
 def initialize_camera_mapping():
     global _cached_cameras
     global _available_cameras
     global _camera_mapping_error
 
     print("========================================")
-    print("카메라 자동 검색 시작")
+    print("Camera discovery started")
 
     try:
-        # 현재 PC에 연결된 카메라 전체 검색
         _available_cameras = discover_available_cameras()
 
-        # 저장된 Side / Top 역할 설정 불러오기
         saved_config = load_camera_config()
 
         if not saved_config:
-            _cached_cameras = {"side": None, "top": None}
+            _cached_cameras = {
+                "side": None,
+                "top": None
+            }
             _camera_mapping_error = None
 
-            print("[카메라 최초 설정 필요] GUI에서 Side / Top 카메라를 지정해 주세요.")
+            print("[Camera setup required] Assign Side / Top roles in GUI.")
             print("========================================")
 
             return True
 
-        # 저장된 역할 설정으로 카메라 자동 매칭
         return apply_camera_config(saved_config)
+
     except Exception as error:
         _available_cameras = []
-        _cached_cameras = {"side": None, "top": None}
+        _cached_cameras = {
+            "side": None,
+            "top": None
+        }
         _camera_mapping_error = str(error)
 
-        print("[카메라 자동 검색 오류]", error)
+        print("[Camera discovery error]", error)
         print("========================================")
 
         return False
+
+def refresh_available_cameras():
+    global _available_cameras
+    global _cached_cameras
+    global _camera_mapping_error
+
+    try:
+        # Search connected cameras again
+        _available_cameras = discover_available_cameras()
+
+        # Keep the user's existing role assignments
+        saved_config = load_camera_config()
+
+        if saved_config:
+            apply_camera_config(saved_config)
+        else:
+            _cached_cameras = {
+                "side": None,
+                "top": None
+            }
+            _camera_mapping_error = None
+
+        return get_available_cameras()
+
+    except Exception as error:
+        _camera_mapping_error = str(error)
+        print("[Camera refresh error]", error)
+        raise RuntimeError(str(error))
 
 # ==========================================
 # 현재 검색된 카메라 목록 가져오기
 # ==========================================
 def get_available_cameras():
-    return [
-        {
+    saved_config = load_camera_config() or {}
+
+    side_camera_id = saved_config.get("side_camera_id")
+    top_camera_id = saved_config.get("top_camera_id")
+
+    camera_list = []
+
+    for camera in _available_cameras:
+        location_id = camera.get("location_id", "")
+
+        role = None
+
+        if side_camera_id and location_id.casefold() == side_camera_id.casefold():
+            role = "side"
+        elif top_camera_id and location_id.casefold() == top_camera_id.casefold():
+            role = "top"
+
+        camera_list.append({
             "name": camera.get("name", ""),
-            "location_id": camera.get("location_id", ""),
-            "dshow_device_name": camera.get("dshow_device_name")
-        }
-        for camera in _available_cameras
-    ]
+            "location_id": location_id,
+            "dshow_device_name": camera.get("dshow_device_name"),
+            "available": bool(camera.get("dshow_device_name")),
+            "role": role
+        })
+
+    return camera_list
+
 
 # ==========================================
 # 저장된 카메라 역할 설정 가져오기
@@ -274,32 +330,43 @@ def get_saved_camera_config():
 # ==========================================
 # GUI에서 지정한 카메라 역할 저장 및 적용
 # ==========================================
-def configure_cameras(side_camera_id, top_camera_id):
+def configure_cameras(side_camera_id=None, top_camera_id=None):
     global _cached_cameras
     global _camera_mapping_error
 
-    if side_camera_id == top_camera_id:
-        return False, "측면 카메라와 상단 카메라는 서로 달라야 합니다."
+    side_camera_id = side_camera_id.strip() if isinstance(side_camera_id, str) else None
+    top_camera_id = top_camera_id.strip() if isinstance(top_camera_id, str) else None
+
+    if not side_camera_id and not top_camera_id:
+        return False, "사이드 또는 탑 카메라를 하나 이상 지정해 주세요."
+
+    if side_camera_id and top_camera_id:
+        if side_camera_id.casefold() == top_camera_id.casefold():
+            return False, "사이드와 탑 카메라는 서로 달라야 합니다."
 
     camera_ids = {
         camera.get("location_id"): camera
         for camera in _available_cameras
     }
 
-    side_camera = camera_ids.get(side_camera_id)
-    top_camera = camera_ids.get(top_camera_id)
+    side_camera = camera_ids.get(side_camera_id) if side_camera_id else None
+    top_camera = camera_ids.get(top_camera_id) if top_camera_id else None
 
-    if not side_camera or not top_camera:
-        return False, "선택한 카메라를 찾을 수 없습니다. 카메라 목록을 새로 확인해 주세요."
+    if side_camera_id and not side_camera:
+        return False, "선택한 사이드 카메라를 찾을 수 없습니다."
 
-    if not side_camera.get("dshow_device_name") or not top_camera.get("dshow_device_name"):
-        return False, "선택한 카메라의 FFmpeg 장치 연결에 실패했습니다."
+    if top_camera_id and not top_camera:
+        return False, "선택한 탑 카메라를 찾을 수 없습니다."
 
-    # JSON 파일에 카메라 역할 설정 저장
+    if side_camera and not side_camera.get("dshow_device_name"):
+        return False, "선택한 사이드 카메라의 FFmpeg 장치 연결에 실패했습니다."
+
+    if top_camera and not top_camera.get("dshow_device_name"):
+        return False, "선택한 탑 카메라의 FFmpeg 장치 연결에 실패했습니다."
+
     if not save_camera_config(side_camera_id, top_camera_id):
         return False, "카메라 설정 파일을 저장하지 못했습니다."
 
-    # 저장한 설정을 현재 서버에도 즉시 적용
     success = apply_camera_config({
         "side_camera_id": side_camera_id,
         "top_camera_id": top_camera_id
@@ -308,8 +375,9 @@ def configure_cameras(side_camera_id, top_camera_id):
     if not success:
         return False, _camera_mapping_error or "카메라 설정을 적용하지 못했습니다."
 
-    print("[카메라 설정 저장 완료]")
-    return True, "카메라 설정이 저장되었습니다."
+    print("[Camera configuration saved]")
+
+    return True, "카메라 역할 설정이 저장되었습니다."
 
 # ==========================================
 # 메모리에 저장된 카메라 매칭 결과 가져오기
