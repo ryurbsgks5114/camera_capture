@@ -334,12 +334,34 @@ def configure_cameras(side_camera_id=None, top_camera_id=None):
     global _cached_cameras
     global _camera_mapping_error
 
-    side_camera_id = side_camera_id.strip() if isinstance(side_camera_id, str) else None
-    top_camera_id = top_camera_id.strip() if isinstance(top_camera_id, str) else None
+    side_camera_id = (
+        side_camera_id.strip()
+        if isinstance(side_camera_id, str)
+        else None
+    )
 
+    top_camera_id = (
+        top_camera_id.strip()
+        if isinstance(top_camera_id, str)
+        else None
+    )
+
+    # 두 역할이 모두 해제된 경우
     if not side_camera_id and not top_camera_id:
-        return False, "사이드 또는 탑 카메라를 하나 이상 지정해 주세요."
+        if not save_camera_config(None, None):
+            return False, "카메라 설정 파일을 저장하지 못했습니다."
 
+        _cached_cameras = {
+            "side": None,
+            "top": None
+        }
+        _camera_mapping_error = None
+
+        print("[Camera configuration cleared]")
+
+        return True, "모든 카메라 역할 설정이 해제되었습니다."
+
+    # 동일한 카메라를 두 역할에 지정할 수 없음
     if side_camera_id and top_camera_id:
         if side_camera_id.casefold() == top_camera_id.casefold():
             return False, "사이드와 탑 카메라는 서로 달라야 합니다."
@@ -349,8 +371,15 @@ def configure_cameras(side_camera_id=None, top_camera_id=None):
         for camera in _available_cameras
     }
 
-    side_camera = camera_ids.get(side_camera_id) if side_camera_id else None
-    top_camera = camera_ids.get(top_camera_id) if top_camera_id else None
+    side_camera = (
+        camera_ids.get(side_camera_id)
+        if side_camera_id else None
+    )
+
+    top_camera = (
+        camera_ids.get(top_camera_id)
+        if top_camera_id else None
+    )
 
     if side_camera_id and not side_camera:
         return False, "선택한 사이드 카메라를 찾을 수 없습니다."

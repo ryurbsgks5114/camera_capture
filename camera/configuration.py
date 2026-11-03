@@ -63,10 +63,6 @@ def save_camera_config(side_camera_id, top_camera_id):
     if not isinstance(top_camera_id, str) or not top_camera_id.strip():
         top_camera_id = None
 
-    # 두 역할이 모두 비어 있으면 저장하지 않음
-    if side_camera_id is None and top_camera_id is None:
-        return False
-
     # 동일한 카메라를 두 역할에 지정할 수 없음
     if (
         side_camera_id is not None
