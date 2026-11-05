@@ -5,6 +5,7 @@ from camera.discovery import get_cached_cameras, get_camera_mapping_error
 from datetime import datetime
 from flask import Blueprint, jsonify, request, current_app
 from services.ftp_service import validate_ftp_connection
+import services.preview_service as preview_service
 
 capture_bp = Blueprint("capture", __name__)
 
@@ -154,6 +155,9 @@ def start_capture():
                 "success": False,
                 "message": ftp_message
             }), 503
+    
+    # 촬영 시작 전 미리보기 종료
+    preview_service.stop_preview()
 
     # 백그라운드 서비스 상태 업데이트
     capture_service.is_running = True
