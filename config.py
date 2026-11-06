@@ -15,15 +15,23 @@ from secret_config import (
 ENABLE_TOP_CAMERA = True
 
 # 카메라 촬영 해상도
-CAPTURE_WIDTH = 1920
-CAPTURE_HEIGHT = 1080
+# CAPTURE_WIDTH = 1920
+# CAPTURE_HEIGHT = 1080
+CAPTURE_WIDTH = 1280
+CAPTURE_HEIGHT = 720
+
+CAMERA_PREOPEN_SECONDS = 5
+
+FRAME_MAX_AGE_MS = 500
+
+CAMERA_SYNC_TOLERANCE_MS = 500
 
 # ==========================================
 # 촬영 설정
 # ==========================================
 
 # 촬영 간격 (분)
-INTERVAL_MINUTES = 1
+INTERVAL_MINUTES = 10
 
 # ==========================================
 # 로컬 저장 설정
