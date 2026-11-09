@@ -10,28 +10,33 @@ from secret_config import (
 # 카메라 설정
 # ==========================================
 
-# 측면 카메라와 상단 카메라의 USB 물리적 경로
-BY_PATH_DIR = Path("/dev/v4l/by-path/")
-SIDE_USB_PATH_KEY = "usb-0:1.3"
-TOP_USB_PATH_KEY = "usb-0:1.5"
+# Side / Top 카메라 역할은 최초 설정 시 GUI에서 지정하고
+# camera_config.json 파일에 저장하여 관리
+ENABLE_TOP_CAMERA = True
 
-# 현재 테스트는 측면 카메라 1대만 사용
-# 두 카메라 테스트로 돌아갈 때 True로 변경
-ENABLE_TOP_CAMERA = False
+# 카메라 촬영 해상도
+CAPTURE_WIDTH = 1920
+CAPTURE_HEIGHT = 1080
+
+CAMERA_PREOPEN_SECONDS = 5
+
+FRAME_MAX_AGE_MS = 500
+
+CAMERA_SYNC_TOLERANCE_MS = 500
 
 # ==========================================
 # 촬영 설정
 # ==========================================
 
 # 촬영 간격 (분)
-INTERVAL_MINUTES = 1
+INTERVAL_MINUTES = 10
 
 # ==========================================
 # 로컬 저장 설정
 # ==========================================
 
 # 사진 저장 폴더
-OUTPUT_DIR = Path.home() / "camera_capture" / "photos"
+OUTPUT_DIR = Path(__file__).resolve().parent / "photos"
 
 # ==========================================
 # FTP 설정
