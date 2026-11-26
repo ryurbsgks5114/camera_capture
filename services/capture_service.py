@@ -1,7 +1,7 @@
 
 import base64
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from camera.capture import (
     CameraFrameStream,
@@ -273,7 +273,8 @@ def capture_cameras(
     ftp_config=None,
     socketio=None,
     local_path=None,
-    camera_streams=None
+    camera_streams=None,
+    scheduled_time=None
 ):
     """
     카메라 최신 프레임을 검증하고 메모리에 확정한 뒤 저장한다.
@@ -320,7 +321,7 @@ def capture_cameras(
         }
 
         # 프레임 확정 시각
-        now = datetime.now()
+        now = scheduled_time or datetime.now()
 
     finally:
         # 저장 및 후처리 전에 카메라 연결 종료
@@ -507,12 +508,13 @@ def capture_loop(
         now = datetime.now()
         target_time = datetime.combine(now.date(), start_time)
 
-        # 기존 동작 유지:
-        # 예약 시간이 이미 지났으면 즉시 촬영 사이클 시작
+        # 파일명에 사용할 예약 촬영 시각
         if target_time <= now:
+            scheduled_capture_time = now.replace(microsecond=0)
             next_capture_time = time.monotonic()
 
         else:
+            scheduled_capture_time = target_time
             wait_seconds = (target_time - now).total_seconds()
             next_capture_time = time.monotonic() + wait_seconds
 
@@ -565,7 +567,8 @@ def capture_loop(
                             ftp_config=ftp_config,
                             socketio=socketio,
                             local_path=local_path,
-                            camera_streams=streams
+                            camera_streams=streams,
+                            scheduled_time=scheduled_capture_time
                         )
 
             except Exception as error:
@@ -584,13 +587,14 @@ def capture_loop(
 
             # 다음 촬영 예정 시간 업데이트
             next_capture_time += interval_seconds
+            scheduled_capture_time += timedelta(seconds=interval_seconds)
 
             current_time = time.monotonic()
 
-            # 촬영 처리 지연으로 다음 예정 시간이 이미 지났다면
-            # 현재 시각을 기준으로 다음 간격을 다시 계산
+            # 기존 스케줄러의 지연 처리 방식 유지
             if next_capture_time <= current_time:
                 next_capture_time = current_time + interval_seconds
+                scheduled_capture_time = (datetime.now() + timedelta(seconds=interval_seconds)).replace(microsecond=0)
 
     except Exception as error:
         # 촬영 루프 자체의 예외 처리
